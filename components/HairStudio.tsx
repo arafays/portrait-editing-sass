@@ -6,6 +6,12 @@ import { DEFAULT_HAIR_PARAMS, HAIR_FIELDS, HairParams } from "@/lib/hairOptions"
 import { createThumbnailDataUrl, resizeImageForUpload } from "@/lib/resizeImage";
 import { useGenerationStage } from "@/lib/useGenerationStage";
 import {
+  getGenerationsRemaining,
+  isGenerationLimitReached,
+  MAX_GENERATIONS,
+  recordGeneration,
+} from "@/lib/generationLimit";
+import {
   clearHistory,
   getHistorySnapshot,
   getServerHistorySnapshot,
@@ -39,6 +45,7 @@ export function HairStudio() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null);
+  const [generationsRemaining, setGenerationsRemaining] = useState(getGenerationsRemaining);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const history = useSyncExternalStore(
@@ -107,6 +114,14 @@ export function HairStudio() {
       return;
     }
 
+    if (isGenerationLimitReached()) {
+      setErrorMessage(
+        `You've used all ${MAX_GENERATIONS} demo generations on this browser. The count is stored locally — clearing site data resets it.`
+      );
+      setStatus("error");
+      return;
+    }
+
     setStatus("generating");
     setErrorMessage(null);
 
@@ -134,6 +149,7 @@ export function HairStudio() {
       setResult(generated);
       setStatus("done");
       setActiveHistoryId(null);
+      setGenerationsRemaining(recordGeneration());
 
       try {
         const beforeThumb = await createThumbnailDataUrl(photoFile);
@@ -304,11 +320,20 @@ export function HairStudio() {
           <button
             type="button"
             onClick={handleGenerate}
-            disabled={status === "generating" || !photoFile}
+            disabled={status === "generating" || !photoFile || generationsRemaining <= 0}
             className="mt-2 rounded-md bg-accent px-4 py-3 font-mono text-sm uppercase tracking-[0.14em] text-accent-ink transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {status === "generating" ? "Generating…" : "Generate"}
+            {status === "generating"
+              ? "Generating…"
+              : generationsRemaining <= 0
+                ? "Limit reached"
+                : "Generate"}
           </button>
+          <p className="text-sm text-foreground-muted">
+            {generationsRemaining > 0
+              ? `${generationsRemaining} of ${MAX_GENERATIONS} demo ${generationsRemaining === 1 ? "generation" : "generations"} left on this browser`
+              : "Demo limit reached — all 3 generations used. Clear site data to reset."}
+          </p>
         </section>
       </div>
 
