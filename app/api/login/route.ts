@@ -6,10 +6,10 @@ export async function POST(request: NextRequest) {
   const password = formData.get("password");
 
   if (typeof password !== "string" || password !== process.env.APP_PASSWORD) {
-    return NextResponse.redirect(new URL("/login?error=1", request.url));
+    return NextResponse.redirect(new URL("/login?error=1", request.url), 303);
   }
 
-  const response = NextResponse.redirect(new URL("/", request.url));
+  const response = NextResponse.redirect(new URL("/", request.url), 303);
   response.cookies.set(SESSION_COOKIE_NAME, createSessionToken(), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
