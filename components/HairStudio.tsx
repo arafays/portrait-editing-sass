@@ -1,14 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { DEFAULT_HAIR_PARAMS, HAIR_FIELDS, HairParams } from "@/lib/hairOptions";
-import { resizeImageForUpload } from "@/lib/resizeImage";
+import { createThumbnailDataUrl, resizeImageForUpload } from "@/lib/resizeImage";
+import { useGenerationStage } from "@/lib/useGenerationStage";
+import {
+  clearHistory,
+  getHistorySnapshot,
+  getServerHistorySnapshot,
+  HistoryEntry,
+  saveHistoryEntry,
+  subscribeHistory,
+} from "@/lib/generationHistory";
 import { StepRail } from "@/components/StepRail";
 import { SwatchDeck } from "@/components/SwatchDeck";
 import { TensionLine } from "@/components/TensionLine";
+import { PastLooks } from "@/components/PastLooks";
 
 type Status = "idle" | "generating" | "done" | "error";
+
+function revokeIfBlobUrl(url: string | null) {
+  if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
+}
 
 interface GenerateResponse {
   resultUrl: string;
@@ -24,11 +38,19 @@ export function HairStudio() {
   const [result, setResult] = useState<GenerateResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const history = useSyncExternalStore(
+    subscribeHistory,
+    getHistorySnapshot,
+    getServerHistorySnapshot
+  );
+  const { label: stageLabel, elapsedLabel } = useGenerationStage(status === "generating", params);
 
   useEffect(() => {
     return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      revokeIfBlobUrl(previewUrl);
     };
   }, [previewUrl]);
 
@@ -42,12 +64,13 @@ export function HairStudio() {
   const selectPhoto = useCallback(
     (file: File | undefined | null) => {
       if (!file || !file.type.startsWith("image/")) return;
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      revokeIfBlobUrl(previewUrl);
       setPhotoFile(file);
       setPreviewUrl(URL.createObjectURL(file));
       setStatus("idle");
       setResult(null);
       setErrorMessage(null);
+      setActiveHistoryId(null);
     },
     [previewUrl]
   );
@@ -56,6 +79,25 @@ export function HairStudio() {
     setParams((prev) => ({ ...prev, [key]: value }));
     setStatus((prev) => (prev === "done" ? "idle" : prev));
     setResult(null);
+  }, []);
+
+  const selectHistoryEntry = useCallback(
+    (entry: HistoryEntry) => {
+      revokeIfBlobUrl(previewUrl);
+      setPhotoFile(null);
+      setPreviewUrl(entry.beforeThumb);
+      setParams(entry.params);
+      setResult({ resultUrl: entry.resultUrl, width: entry.width, height: entry.height });
+      setStatus("done");
+      setErrorMessage(null);
+      setActiveHistoryId(entry.id);
+    },
+    [previewUrl]
+  );
+
+  const handleClearHistory = useCallback(() => {
+    clearHistory();
+    setActiveHistoryId(null);
   }, []);
 
   const handleGenerate = useCallback(async () => {
@@ -88,8 +130,23 @@ export function HairStudio() {
         throw new Error(payload.error ?? "Generation failed. Please try again.");
       }
 
-      setResult(payload as GenerateResponse);
+      const generated = payload as GenerateResponse;
+      setResult(generated);
       setStatus("done");
+      setActiveHistoryId(null);
+
+      try {
+        const beforeThumb = await createThumbnailDataUrl(photoFile);
+        saveHistoryEntry({
+          params,
+          resultUrl: generated.resultUrl,
+          width: generated.width,
+          height: generated.height,
+          beforeThumb,
+        });
+      } catch {
+        // History is a convenience; a failed thumbnail must not fail the generation.
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Generation failed. Please try again.");
       setStatus("error");
@@ -240,7 +297,9 @@ export function HairStudio() {
             </p>
           )}
 
-          {status === "generating" && <TensionLine />}
+          {status === "generating" && (
+            <TensionLine label={stageLabel} elapsedLabel={elapsedLabel} />
+          )}
 
           <button
             type="button"
@@ -252,6 +311,14 @@ export function HairStudio() {
           </button>
         </section>
       </div>
+
+      <PastLooks
+        entries={history}
+        activeId={activeHistoryId}
+        disabled={status === "generating"}
+        onSelect={selectHistoryEntry}
+        onClear={handleClearHistory}
+      />
     </div>
   );
 }
