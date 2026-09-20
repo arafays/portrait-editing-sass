@@ -1,26 +1,87 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #17140f;
+  --background-raised: #1e1a13;
+  --foreground: #f4efe4;
+  --foreground-muted: #a89e8b;
+  --surface: #f4efe4;
+  --surface-muted: #e8e0cd;
+  --ink: #1c1710;
+  --ink-muted: #6b6153;
+  --accent: #c1793d;
+  --accent-strong: #d98a48;
+  --accent-ink: #1c1108;
+  --danger: #b6432f;
+  --danger-ink: #f4efe4;
+  --line: rgba(244, 239, 228, 0.12);
+  --line-on-surface: rgba(28, 23, 16, 0.12);
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-background-raised: var(--background-raised);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-foreground-muted: var(--foreground-muted);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-ink: var(--accent-ink);
+  --color-danger: var(--danger);
+  --color-danger-ink: var(--danger-ink);
+  --color-line: var(--line);
+  --color-line-on-surface: var(--line-on-surface);
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+@keyframes tension-vibrate {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(2.4);
+  }
+}
+
+@keyframes tension-sweep {
+  0% {
+    transform: translateX(-40%);
+  }
+  100% {
+    transform: translateX(140%);
+  }
+}
+
+.animate-tension-vibrate {
+  animation: tension-vibrate 0.55s ease-in-out infinite;
+}
+
+.animate-tension-sweep {
+  animation: tension-sweep 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes reveal-settle {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-reveal-settle {
+  animation: reveal-settle 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
